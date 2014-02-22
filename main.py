@@ -1,3 +1,4 @@
+import errno
 import csv
 import re
 import time
@@ -6,10 +7,9 @@ import os
 from urllib2 import urlopen
 from bs4 import BeautifulSoup
 
-YEAR = "2012"
 BASE_URL = "http://torrentz.eu"
-SEARCH_URL = BASE_URL + "/verifiedP?f=movies+" + YEAR
-OUTPUT_FILE = os.path.join("results", "main_%s_page_%s.csv")
+SEARCH_URL = BASE_URL + "/verifiedP?f=movies+"
+OUTPUT_FILE = "main_%s_page_%s.csv"
 
 
 class Record:
@@ -30,11 +30,17 @@ class Record:
         return int(re.sub(r'[^\x00-\x7F]+', '', rating))
 
     def get_date(self):
-        return self.row.find("span", {"class": "a"}).find("span").get("title")
+        date = self.row.find("span", {"class": "a"})
+        if not date:
+            return None
+        return date.find("span").get("title")
 
     def get_size(self):
         # Always in MB
-        _ = self.row.find("span", {"class": "s"}).get_text().strip().split()
+        _ = self.row.find("span", {"class": "s"})
+        if not _:
+            return None
+        _ = _.get_text().strip().split()
         size = int(_[0])
         unit = _[1]
         if unit == "GB":
@@ -62,43 +68,59 @@ class Record:
         ]
 
 
-def run():
-        page_number = 0
-        url = ""
-        total = 0
-        while(True):
-            try:
-                url = "%s&p=%s" % (SEARCH_URL, page_number)
-                print "[STATUS] Connecting to URL: %s." % url
-                webpage = urlopen(url).read()
-            except Exception, e:
-                print "[ERROR] Can't connect to URL: %s. Reason: %s." % (url, e)
-                break
-            else:
-                print "[STATUS] Connected. Parsing URL content."
-                soup = BeautifulSoup(webpage.decode('utf-8', 'ignore'))
-                rows = soup.find("div", {"class": "results"}).find_all('dl')
+def run(year):
+    output_file = os.path.join("results", year, OUTPUT_FILE)
+    create_folder(output_file)
 
-                if len(rows) == 1:
-                    text = rows[0].find("dt").get_text().strip()
-                    if text == "No Torrents yet":
-                        print "[STATUS] Page is empty. Exit."
-                        break
-                with open(OUTPUT_FILE % (YEAR, page_number), "w") as f:
-                    writer = csv.writer(f, delimiter=';', quotechar='"',
-                                        quoting=csv.QUOTE_MINIMAL)
+    page_number = 150
+    url = ""
+    total = 0
+    while(True):
+        try:
+            url = "%s%s&p=%s" % (SEARCH_URL, year, page_number)
+            print "[STATUS] Connecting to URL: %s." % url
+            webpage = urlopen(url).read()
+        except Exception, e:
+            print "[ERROR] Can't connect to URL: %s. Reason: %s." % (url, e)
+            break
+        else:
+            print "[STATUS] Connected. Parsing URL content."
+            soup = BeautifulSoup(webpage.decode('utf-8', 'ignore'))
+            rows = soup.find("div", {"class": "results"}).find_all('dl')
 
-                    for row in rows:
-                        record = Record(row)
-                        print " - Parsed: %s" % record.get_title()
-                        writer.writerow(record.get_data())
-                        total += 1
+            if len(rows) == 1:
+                text = rows[0].find("dt").get_text().strip()
+                if text == "No Torrents yet":
+                    print "[STATUS] Page is empty. Exit."
+                    break
+            with open(output_file % (year, page_number), "w") as f:
+                writer = csv.writer(f, delimiter=';', quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
 
-            page_number += 1
-            print "[STATUS] Sleeping .."
-            time.sleep(5)
+                for row in rows:
+                    record = Record(row)
+                    print " - Parsed: %s" % record.get_title()
+                    writer.writerow(record.get_data())
+                    total += 1
 
-        print "[STATUS] Parsing %s pages done. Total: %s." % (page_number, total)
+        page_number += 1
+        print "[STATUS] Sleeping .."
+        time.sleep(2)
+
+    print "[STATUS] Parsing %s pages done. Total: %s." % (page_number, total)
+
+
+def create_folder(output_file):
+    path = os.path.dirname(output_file)
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
+
 
 if __name__ == "__main__":
-    run()
+    for year in ["2011", "2012", "2013"]:
+        run(year)
+        print "[STATUS] Long sleeping ......"
+        time.sleep(60)
