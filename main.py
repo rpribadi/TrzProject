@@ -72,7 +72,7 @@ def run(year):
     output_file = os.path.join("results", year, OUTPUT_FILE)
     create_folder(output_file)
 
-    page_number = 150
+    page_number = 0
     url = ""
     total = 0
     while(True):
