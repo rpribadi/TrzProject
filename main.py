@@ -69,19 +69,20 @@ def run():
         while(True):
             try:
                 url = "%s&p=%s" % (SEARCH_URL, page_number)
-                print "[STATUS] Connecting to URL: %s" % url
+                print "[STATUS] Connecting to URL: %s." % url
                 webpage = urlopen(url).read()
             except Exception, e:
-                print "[ERROR] Can't connect to URL: %s. Reason: %s" % (url, e)
+                print "[ERROR] Can't connect to URL: %s. Reason: %s." % (url, e)
                 break
             else:
-                print "[STATUS] Connected. Parsing URL content"
+                print "[STATUS] Connected. Parsing URL content."
                 soup = BeautifulSoup(webpage.decode('utf-8', 'ignore'))
                 rows = soup.find("div", {"class": "results"}).find_all('dl')
 
                 if len(rows) == 1:
                     text = rows[0].find("dt").get_text().strip()
                     if text == "No Torrents yet":
+                        print "[STATUS] Page is empty. Exit."
                         break
                 with open(OUTPUT_FILE % (YEAR, page_number), "w") as f:
                     writer = csv.writer(f, delimiter=';', quotechar='"',
@@ -97,7 +98,7 @@ def run():
             print "[STATUS] Sleeping .."
             time.sleep(5)
 
-        print "[STATUS] Parsing %s pages done. Total: %s" % (page_number, total)
+        print "[STATUS] Parsing %s pages done. Total: %s." % (page_number, total)
 
 if __name__ == "__main__":
     run()
