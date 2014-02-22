@@ -105,7 +105,7 @@ def run(year):
 
         page_number += 1
         print "[STATUS] Sleeping .."
-        time.sleep(2)
+        time.sleep(5)
 
     print "[STATUS] Parsing %s pages done. Total: %s." % (page_number, total)
 
