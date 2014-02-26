@@ -2,140 +2,271 @@ import errno
 import csv
 import math
 import re
-import requests
 import time
 import os
 
 from urllib2 import urlopen
 from bs4 import BeautifulSoup
 
-BASE_URL = "http://www.imdb.com/"
-SEARCH_URL = BASE_URL + "search/title?at=0&sort=moviemeter,asc&start=%s&title_type=feature&year=%s,%s"
-OUTPUT_FILE = "main_%s_page_%s.csv"
+BASE_URL = "http://www.imdb.com"
+SEARCH_URL = BASE_URL + "/search/title?at=0&sort=moviemeter,asc&start=%s&title_type=feature&year=%s,%s"
+OUTPUT_FILE = "%s_%s_page_%s.csv"
 RECORD_PER_PAGE = 50
 
 
-class Record:
-    def __init__(self, row):
-        self.row = row
+class Movie:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        self.soup = soup
 
     def get_id(self):
-        return self.row.find("a").get("href")[1:]
+        return self.movie_id
 
     def get_title(self):
-        return self.row.find("a").get_text().strip().encode("utf-8")
+        return (self.soup.find("h1")
+                         .find('span', {'class': 'itemprop'})
+                         .get_text()
+                         .strip()
+                         .encode('utf-8'))
 
-    def get_url(self):
-        return self.row.find("a").get("href")
+    def get_year(self):
+        return (self.soup.find("h1")
+                         .find('span', {'class': 'nobr'})
+                         .find('a')
+                         .get_text()
+                         .strip())
 
     def get_rating(self):
-        rating = self.row.find("span", {"class": "v"}).get_text().strip()
-        return int(re.sub(r'[^\x00-\x7F]+', '', rating))
-
-    def get_date(self):
-        date = self.row.find("span", {"class": "a"})
-        if not date:
+        rating = (self.soup
+                      .find('div', {'class': ['titlePageSprite',
+                                             'star-box-giga-star']}))
+        if not rating:
             return None
-        return date.find("span").get("title")
 
-    def get_size(self):
-        # Always in MB
-        _ = self.row.find("span", {"class": "s"})
-        if not _:
+        return rating.get_text().strip()
+
+    def get_genres(self):
+        genres = (self.soup
+                    .find('div', {'id': "titleStoryLine"})
+                    .find("h4", text="Genres:")
+                    .find_next_siblings('a'))
+        if not genres:
             return None
-        _ = _.get_text().strip().split()
-        size = int(_[0])
-        unit = _[1]
-        if unit == "GB":
-            size = size * 1024
-        return size
+        return ",".join([g.get_text().strip() for g in genres])
 
-    def get_seeder(self):
-        seeder = self.row.find("span", {"class": "u"}).get_text().strip()
-        return int(seeder.replace(",", ""))
+    def get_budget(self):
+        budget = (self.soup
+                    .find('div', {'id': "titleDetails"})
+                    .find("h4", text="Budget:"))
+        if not budget:
+            return None
 
-    def get_leecher(self):
-        leecher = self.row.find("span", {"class": "d"}).get_text().strip()
-        return int(leecher.replace(",", ""))
+        return int(budget.next.next
+                         .replace("$", "")
+                         .replace(",", ""))
+
+    def get_runtime(self):
+        runtime = (self.soup
+                       .find('div', {'id': "titleDetails"})
+                       .find("h4", text="Runtime:"))
+        if not runtime:
+            return None
+        return runtime.find_next_sibling('time').get_text().strip().split()[0]
+
+    def get_mpaa(self):
+
+        mpaa = (self.soup
+                    .find('div', {'id': "titleStoryLine"})
+                    .find("span", {'itemprop': 'contentRating'}))
+        if not mpaa:
+            return None
+        return mpaa.get_text().strip()
 
     def get_data(self):
         return [
             self.get_id(),
             self.get_title(),
-            self.get_url(),
+            self.get_year(),
             self.get_rating(),
-            self.get_date(),
-            self.get_size(),
-            self.get_seeder(),
-            self.get_leecher()
+            self.get_genres(),
+            self.get_runtime(),
+            self.get_budget(),
+            self.get_mpaa()
         ]
 
 
+class MovieReleaseDate:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        table = soup.find("table", {"id": "release_dates"})
+        if not table:
+            self.rows = []
+        else:
+            self.rows = table.findAll("tr")
+
+    def get_country(self, index):
+        return self.rows[index].findAll("td")[0].get_text().strip()
+
+    def get_date(self, index):
+        return self.rows[index].findAll("td")[1].get_text().strip()
+
+    def get_remarks(self, index):
+        remarks = (self.rows[index]
+                       .findAll('td')[2]
+                       .get_text()
+                       .strip()
+                       .replace("\n", "")
+                       .replace("\r", ""))
+        remarks = re.sub(" {2,}", " ", remarks)
+        if not remarks:
+            return None
+        return remarks
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_country(index),
+            self.get_date(index),
+            self.get_remarks(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
+
+class MovieCast:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        table = soup.find("table", {"class": "cast_list"})
+        if not table:
+            self.rows = []
+        else:
+            self.rows = table.findAll("tr")[1:]
+
+    def get_id(self, index):
+        href = self.rows[index].findAll("td")[1].find('a').get('href')
+        return re.search('/name/(?P<id>\w+)/', href).group('id')
+
+    def get_character(self, index):
+        character = (self.rows[index]
+                        .findAll("td")[3]
+                        .get_text()
+                        .strip()
+                        .encode('utf-8')
+                        .replace("\n", "")
+                        .replace("\r", ""))
+        return re.sub(" {2,}", " ", character)
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_id(index),
+            self.get_character(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
+
 def get_total_page(year):
-    try:
-        url = SEARCH_URL % (0, year, year)
-        print "[STATUS] Connecting to URL: %s." % url
-        webpage = urlopen(url).read()
-    except Exception, e:
-        print "[ERROR] Can't connect to URL: %s. Reason: %s." % (url, e)
+    url = SEARCH_URL % (0, year, year)
+    soup = get_soup_page(url)
+    if not soup:
         return 0
-    else:
-        print "[STATUS] Connected. Parsing URL content."
-        soup = BeautifulSoup(webpage.decode('utf-8', 'ignore'))
-        _ = soup.find("div", {"class": "leftright"}).find("div", {"id": "left"}).get_text().strip();
-        total_record = int(re.search(r"of (?P<total>[0-9,]+)\s*titles", _).group('total').replace(",", ""))
-        return math.ceil(total_record/RECORD_PER_PAGE)
-        
+    _ = (soup.find("div", {"class": "leftright"})
+             .find("div", {"id": "left"})
+             .get_text()
+             .strip())
+    total_record = int(re.search(r"of (?P<total>[0-9,]+)\s*titles", _)
+                         .group('total')
+                         .replace(",", ""))
+    return int(math.ceil(total_record / RECORD_PER_PAGE))
+
 
 def get_soup_page(url):
+    # Always sleep before making any call
+    time.sleep(2)
     try:
         print "[STATUS] Connecting to URL: %s." % url
-        #webpage = urlopen(url).read()
-        webpage = requests.get(url).text
+        webpage = urlopen(url).read()
     except Exception, e:
         print "[ERROR] Can't connect to URL: %s. Reason: %s." % (url, e)
         return None
     else:
         print "[STATUS] Connected. Parsing URL content."
-        return BeautifulSoup(webpage.encode('utf-8'))
+        return BeautifulSoup(webpage.decode('utf-8', "ignore"))
+
 
 def run(year, from_page, to_page):
 
-    output_file = os.path.join("results", "movie", year, OUTPUT_FILE)
-    create_folder(output_file)
+    output_m = os.path.join("results", year, "movie", OUTPUT_FILE)
+    output_c = os.path.join("results", year, "cast", OUTPUT_FILE)
+    output_r = os.path.join("results", year, "release", OUTPUT_FILE)
 
-    page_number = 0 
+    create_folder(output_m)
+    create_folder(output_c)
+    create_folder(output_r)
+
+    page_number = 0
     total = 0
     for page_number in range(from_page, to_page):
         start_at = 1 + page_number * RECORD_PER_PAGE
         url = SEARCH_URL % (start_at, year, year)
-        time.sleep(2)
         soup = get_soup_page(url)
 
         rows = soup.find("table", {"class": "results"}).find_all('tr')
 
-        with open(output_file % (year, page_number), "w") as f:
-            writer = csv.writer(f, delimiter=';', quotechar='"',
-                                quoting=csv.QUOTE_MINIMAL)
+        with open(output_m % ("movie", year, page_number), "w") as f_m, open(output_c % ("cast", year, page_number), "w") as f_c, open(output_r % ("release", year, page_number), "w") as f_r:
+
+            writer_m = csv.writer(f_m, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
+            writer_c = csv.writer(f_c, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
+            writer_r = csv.writer(f_r, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
 
             for row in rows[1:3]:
-                time.sleep(2)
-                detail_url = row.find("td", {"class": "title"}).find("a").get("href")
+                detail_url = (row.find("td", {"class": "title"})
+                                 .find("a")
+                                 .get("href"))
                 detail_soup = get_soup_page(BASE_URL + detail_url)
-                #movie = Movie(detail_soup)
-                #cast = Cast(detail_soup)
-                release_url = detail_soup.find("h4", text="Release Date:").findNext("span").find("a").get("href")
-                print release_url
-                #release_date = ReleaseDate(get_soup_page(release_url))
+                movie_id = (re.search(r"/title/(?P<movie_id>\w+)/",
+                                     detail_url)
+                              .group("movie_id"))
 
-#                     record = Record(row)
-#                     print " - Parsed: %s" % record.get_title()
-#                     writer.writerow(record.get_data())
+                movie = Movie(movie_id, detail_soup)
+                print " - Parsed %s" % movie.get_title()
+                writer_m.writerow(movie.get_data())
+
+                cast = MovieCast(movie_id, detail_soup)
+                results = cast.get_data()
+                print "   + Parsed %d casts" % len(results)
+                writer_c.writerows(results)
+
+                release_url = (detail_soup.find("a", text="Release Dates")
+                                          .get("href"))
+                release_date = MovieReleaseDate(
+                    movie_id, get_soup_page(BASE_URL + release_url)
+                )
+                results = release_date.get_data()
+                print "   + Parsed %d release dates" % len(results)
+                writer_r.writerows(results)
+
                 total += 1
                 print "[STATUS] Sleeping .."
 
         print "[STATUS] Page Sleeping .."
-        time.sleep(5)
+        time.sleep(2)
 
     print "[STATUS] Parsing %s pages done. Total: %s." % (page_number, total)
 
@@ -150,9 +281,11 @@ def create_folder(output_file):
 
 
 if __name__ == "__main__":
-    # Number of movies is hardcoded for now
-    for year in ["2011", "2012", "2013"]:
+    for year in ["2011"]:  # , "2012", "2013"]:
+        print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
+        print "[STATUS] Found %s pages" % total_page
         run(year, 0, 1)
+        run(year, 153, 154)
         print "[STATUS] Long sleeping ......"
-        time.sleep(60)
+        time.sleep(2)

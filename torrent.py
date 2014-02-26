@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 BASE_URL = "http://torrentz.eu"
 SEARCH_URL = BASE_URL + "/verifiedP?f=movies+"
-OUTPUT_FILE = "main_%s_page_%s.csv"
+OUTPUT_FILE = "torrent_%s_page_%s.csv"
 
 
 class Record:
@@ -69,7 +69,7 @@ class Record:
 
 
 def run(year):
-    output_file = os.path.join("results", year, OUTPUT_FILE)
+    output_file = os.path.join("results", year, 'torrent', OUTPUT_FILE)
     create_folder(output_file)
 
     page_number = 0
