@@ -94,6 +94,86 @@ class Movie:
             self.get_mpaa()
         ]
 
+class MovieDirector:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        table = soup.find("h4", text="Directors:")
+        if not table:
+            self.rows = []
+        else:
+            self.rows = table.find_next_siblings("a")
+
+    def get_id(self, index):
+        return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get('href')).group("id")
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_id(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
+
+class MovieWriter:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        table = soup.find("h4", text="Writers:")
+        if not table:
+            self.rows = []
+        else:
+            self.rows = table.find_next_siblings("a")
+
+    def get_id(self, index):
+        return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get('href')).group("id")
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_id(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
+
+class MovieProduction:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        table = soup.find("h4", text="Writers:")
+        if not table:
+            self.rows = []
+        else:
+            self.rows = table.find_next_siblings("span", {"itemprop": "creator"})
+
+    def get_id(self, index):
+        return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get("a").get('href')).group("id")
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_id(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
 
 class MovieReleaseDate:
     def __init__(self, movie_id, soup):
@@ -212,10 +292,16 @@ def run(year, from_page, to_page):
     output_m = os.path.join("results", year, "movie", OUTPUT_FILE)
     output_c = os.path.join("results", year, "cast", OUTPUT_FILE)
     output_r = os.path.join("results", year, "release", OUTPUT_FILE)
+    output_d = os.path.join("results", year, "director", OUTPUT_FILE)
+    output_w = os.path.join("results", year, "writer", OUTPUT_FILE)
+    output_p = os.path.join("results", year, "production", OUTPUT_FILE)
 
     create_folder(output_m)
     create_folder(output_c)
     create_folder(output_r)
+    create_folder(output_d)
+    create_folder(output_w)
+    create_folder(output_p)
 
     page_number = 0
     total = 0
@@ -226,13 +312,19 @@ def run(year, from_page, to_page):
 
         rows = soup.find("table", {"class": "results"}).find_all('tr')
 
-        with open(output_m % ("movie", year, page_number), "w") as f_m, open(output_c % ("cast", year, page_number), "w") as f_c, open(output_r % ("release", year, page_number), "w") as f_r:
+        with open(output_m % ("movie", year, page_number), "w") as f_m, open(output_c % ("cast", year, page_number), "w") as f_c, open(output_r % ("release", year, page_number), "w") as f_r, open(output_d % ("director", year, page_number), "w") as f_d, open(output_w % ("writer", year, page_number), "w") as f_w, open(output_p % ("production", year, page_number), "w") as f_p:
 
             writer_m = csv.writer(f_m, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
             writer_c = csv.writer(f_c, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
             writer_r = csv.writer(f_r, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
+            writer_d = csv.writer(f_d, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
+            writer_w = csv.writer(f_w, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
+            writer_p = csv.writer(f_p, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
 
             for row in rows[1:3]:
@@ -247,6 +339,21 @@ def run(year, from_page, to_page):
                 movie = Movie(movie_id, detail_soup)
                 print " - Parsed %s" % movie.get_title()
                 writer_m.writerow(movie.get_data())
+
+                director = MovieDirector(movie_id, detail_soup)
+                results = director.get_data()
+                print "   + Parsed %d directors" % len(results)
+                writer_d.writerows(results)
+
+                writer = MovieWriter(movie_id, detail_soup)
+                results = writer.get_data()
+                print "   + Parsed %d writers" % len(results)
+                writer_w.writerows(results)
+
+                production = MovieWriter(movie_id, detail_soup)
+                results = production.get_data()
+                print "   + Parsed %d productions" % len(results)
+                writer_p.writerows(results)
 
                 cast = MovieCast(movie_id, detail_soup)
                 results = cast.get_data()
@@ -288,4 +395,4 @@ if __name__ == "__main__":
         run(year, 0, 1)
         run(year, 153, 154)
         print "[STATUS] Long sleeping ......"
-        time.sleep(2)
+        time.sleep(30)
