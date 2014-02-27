@@ -94,14 +94,15 @@ class Movie:
             self.get_mpaa()
         ]
 
+
 class MovieDirector:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = soup.find("h4", text="Directors:")
+        table = soup.find("div", {"id": "title-overview-widget"}).find("h4", text=re.compile(r"Director[s]{0,1}:"))
         if not table:
             self.rows = []
         else:
-            self.rows = table.find_next_siblings("a")
+            self.rows = table.find_next_siblings("a", {'itemprop': 'url'})
 
     def get_id(self, index):
         return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get('href')).group("id")
@@ -124,13 +125,14 @@ class MovieDirector:
 class MovieWriter:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = soup.find("h4", text="Writers:")
+        table = soup.find("div", {"id": "title-overview-widget"}).find("h4", text=re.compile(r"Writer[s]{0,1}:"))
         if not table:
             self.rows = []
         else:
-            self.rows = table.find_next_siblings("a")
+            self.rows = table.find_next_siblings("a", {'itemprop': 'url'})
 
     def get_id(self, index):
+        print self.rows[index].get('href')
         return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get('href')).group("id")
 
     def get_data_at(self, index):
