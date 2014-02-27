@@ -82,6 +82,24 @@ class Movie:
             return None
         return mpaa.get_text().strip()
 
+    def get_country(self):
+
+        country = (self.soup
+                       .find('div', {'id': "titleDetails"})
+                       .find("h4", text="Country:"))
+        if not country:
+            return None
+        return country.find_next_sibling("a").get_text().strip()
+
+    def get_language(self):
+
+        language = (self.soup
+                    .find('div', {'id': "titleDetails"})
+                    .find("h4", text="Language:"))
+        if not language:
+            return None
+        return language.find_next_sibling("a").get_text().strip().encode("utf-8")
+
     def get_data(self):
         return [
             self.get_id(),
@@ -91,21 +109,27 @@ class Movie:
             self.get_genres(),
             self.get_runtime(),
             self.get_budget(),
-            self.get_mpaa()
+            self.get_mpaa(),
+            self.get_country(),
+            self.get_language()
         ]
 
 
 class MovieDirector:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = soup.find("div", {"id": "title-overview-widget"}).find("h4", text=re.compile(r"Director[s]{0,1}:"))
+        table = (soup.find("div", {"id": "title-overview-widget"})
+                     .find("h4", text=re.compile(r"Director[s]{0,1}:")))
         if not table:
             self.rows = []
         else:
             self.rows = table.find_next_siblings("a", {'itemprop': 'url'})
 
     def get_id(self, index):
-        return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get('href')).group("id")
+        return re.search(
+            r"/name/(?P<id>\w+)/",
+            self.rows[index].get('href')
+        ).group("id")
 
     def get_data_at(self, index):
         return [
@@ -125,15 +149,18 @@ class MovieDirector:
 class MovieWriter:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = soup.find("div", {"id": "title-overview-widget"}).find("h4", text=re.compile(r"Writer[s]{0,1}:"))
+        table = (soup.find("div", {"id": "title-overview-widget"})
+                     .find("h4", text=re.compile(r"Writer[s]{0,1}:")))
         if not table:
             self.rows = []
         else:
             self.rows = table.find_next_siblings("a", {'itemprop': 'url'})
 
     def get_id(self, index):
-        print self.rows[index].get('href')
-        return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get('href')).group("id")
+        return re.search(
+            r"/name/(?P<id>\w+)/",
+            self.rows[index].get('href')
+        ).group("id")
 
     def get_data_at(self, index):
         return [
@@ -160,7 +187,10 @@ class MovieProduction:
             self.rows = table.find_next_siblings("span", {"itemprop": "creator"})
 
     def get_id(self, index):
-        return re.search(r"/name/(?P<id>\w+)/", self.rows[index].get("a").get('href')).group("id")
+        return re.search(
+            r"/name/(?P<id>\w+)/",
+            self.rows[index].get("a").get('href')
+        ).group("id")
 
     def get_data_at(self, index):
         return [
@@ -196,6 +226,7 @@ class MovieReleaseDate:
         remarks = (self.rows[index]
                        .findAll('td')[2]
                        .get_text()
+                       .encode("utf-8")
                        .strip()
                        .replace("\n", "")
                        .replace("\r", ""))
@@ -228,7 +259,7 @@ class MovieCast:
         if not table:
             self.rows = []
         else:
-            self.rows = table.findAll("tr")[1:]
+            self.rows = table.findAll("tr", {"class": ["odd", "even"]})
 
     def get_id(self, index):
         href = self.rows[index].findAll("td")[1].find('a').get('href')
@@ -312,7 +343,8 @@ def run(year, from_page, to_page):
         url = SEARCH_URL % (start_at, year, year)
         soup = get_soup_page(url)
 
-        rows = soup.find("table", {"class": "results"}).find_all('tr')
+        rows = (soup.find("table", {"class": "results"})
+                    .find_all('tr', {'class': ['even', 'odd']}))
 
         with open(output_m % ("movie", year, page_number), "w") as f_m, open(output_c % ("cast", year, page_number), "w") as f_c, open(output_r % ("release", year, page_number), "w") as f_r, open(output_d % ("director", year, page_number), "w") as f_d, open(output_w % ("writer", year, page_number), "w") as f_w, open(output_p % ("production", year, page_number), "w") as f_p:
 
@@ -329,7 +361,7 @@ def run(year, from_page, to_page):
             writer_p = csv.writer(f_p, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
 
-            for row in rows[1:3]:
+            for row in rows:
                 detail_url = (row.find("td", {"class": "title"})
                                  .find("a")
                                  .get("href"))
@@ -394,7 +426,7 @@ if __name__ == "__main__":
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
-        run(year, 0, 1)
-        run(year, 153, 154)
+        #run(year, 0, total_page)
+        run(year, 1, 100)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
