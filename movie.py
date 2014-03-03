@@ -61,9 +61,7 @@ class Movie:
         if not budget:
             return None
 
-        return int(budget.next.next
-                         .replace("$", "")
-                         .replace(",", ""))
+        return budget.next.next.strip().encode("utf-8")
 
     def get_runtime(self):
         runtime = (self.soup
@@ -361,7 +359,8 @@ def run(year, from_page, to_page):
             writer_p = csv.writer(f_p, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
 
-            for row in rows:
+#            for row in rows:
+            for row in rows[0:2]:
                 detail_url = (row.find("td", {"class": "title"})
                                  .find("a")
                                  .get("href"))
@@ -427,6 +426,6 @@ if __name__ == "__main__":
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
         #run(year, 0, total_page)
-        run(year, 1, 100)
+        run(year, 0, 1)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
