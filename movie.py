@@ -45,15 +45,6 @@ class Movie:
 
         return rating.get_text().strip()
 
-    def get_genres(self):
-        genres = (self.soup
-                    .find('div', {'id': "titleStoryLine"})
-                    .find("h4", text="Genres:")
-                    .find_next_siblings('a'))
-        if not genres:
-            return None
-        return ",".join([g.get_text().strip() for g in genres])
-
     def get_budget(self):
         budget = (self.soup
                     .find('div', {'id': "titleDetails"})
@@ -62,6 +53,69 @@ class Movie:
             return None
 
         return budget.next.next.strip().encode("utf-8")
+
+    def get_opening_weekend_gross(self):
+        gross = (self.soup
+                     .find('div', {'id': "titleDetails"})
+                     .find("h4", text="Opening Weekend:"))
+        if not gross:
+            return None
+
+        gross = gross.next.next.strip()
+        return gross.split()[0].encode("utf-8")
+
+    def get_opening_weekend_country(self):
+        gross = (self.soup
+                     .find('div', {'id': "titleDetails"})
+                     .find("h4", text="Opening Weekend:"))
+        if not gross:
+            return None
+
+        country = gross.next.next.strip()
+        return country.split()[1].replace("(", "").replace(")", "")
+
+    def get_opening_weekend_date(self):
+        gross = (self.soup
+                     .find('div', {'id': "titleDetails"})
+                     .find("h4", text="Opening Weekend:"))
+        if not gross:
+            return None
+
+        gross = gross.find_next_sibling("span").get_text().strip()
+        return (gross.replace("(", "")
+                     .replace(")", "")
+                     .encode("utf-8"))
+
+    def get_gross(self):
+        gross = (self.soup
+                     .find('div', {'id': "titleDetails"})
+                     .find("h4", text="Gross:"))
+        if not gross:
+            return None
+
+        return gross.next.next.strip().encode("utf-8")
+
+    def get_gross_country(self):
+        gross = (self.soup
+                     .find('div', {'id': "titleDetails"})
+                     .find("h4", text="Gross:"))
+        if not gross:
+            return None
+
+        country = gross.find_next_sibling("span").get_text().strip()
+        return country.replace("(", "").replace(")", "")
+
+    def get_gross_date(self):
+        gross = (self.soup
+                     .find('div', {'id': "titleDetails"})
+                     .find("h4", text="Gross:"))
+        if not gross:
+            return None
+
+        gross = gross.find_next_sibling("span").find_next_sibling("span").get_text().strip()
+        return (gross.replace("(", "")
+                     .replace(")", "")
+                     .encode("utf-8"))
 
     def get_runtime(self):
         runtime = (self.soup
@@ -104,16 +158,81 @@ class Movie:
             self.get_title(),
             self.get_year(),
             self.get_rating(),
-            self.get_genres(),
             self.get_runtime(),
             self.get_budget(),
+            self.get_opening_weekend_gross(),
+            self.get_opening_weekend_country(),
+            self.get_opening_weekend_date(),
+            self.get_gross(),
+            self.get_gross_country(),
+            self.get_gross_date(),
             self.get_mpaa(),
             self.get_country(),
-            self.get_language()
+            self.get_language(),
         ]
 
 
+class MovieGenre:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        self.soup = soup
+        self.rows = []
+        genres = (self.soup
+                      .find('div', {'id': "titleStoryLine"})
+                      .find("h4", text="Genres:"))
+        if genres:
+            self.rows = genres.find_next_siblings('a')
+
+    def get_genre(self, index):
+        return self.rows[index].get_text().strip()
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_genre(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
+
 class MovieDirector:
+    def __init__(self, movie_id, soup):
+        self.movie_id = movie_id
+        table = (soup.find("div", {"id": "title-overview-widget"})
+                     .find("h4", text=re.compile(r"Director[s]{0,1}:")))
+        if not table:
+            self.rows = []
+        else:
+            self.rows = table.find_next_siblings("a", {'itemprop': 'url'})
+
+    def get_id(self, index):
+        return re.search(
+            r"/name/(?P<id>\w+)/",
+            self.rows[index].get('href')
+        ).group("id")
+
+    def get_data_at(self, index):
+        return [
+            self.movie_id,
+            self.get_id(index)
+        ]
+
+    def get_data(self):
+        data = []
+        index = 0
+        while index < len(self.rows):
+            data.append(self.get_data_at(index))
+            index += 1
+        return data
+
+
+class MovieOpeningWeeked:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
         table = (soup.find("div", {"id": "title-overview-widget"})
@@ -326,6 +445,7 @@ def run(year, from_page, to_page):
     output_d = os.path.join("results", year, "director", OUTPUT_FILE)
     output_w = os.path.join("results", year, "writer", OUTPUT_FILE)
     output_p = os.path.join("results", year, "production", OUTPUT_FILE)
+    output_g = os.path.join("results", year, "genre", OUTPUT_FILE)
 
     create_folder(output_m)
     create_folder(output_c)
@@ -333,6 +453,7 @@ def run(year, from_page, to_page):
     create_folder(output_d)
     create_folder(output_w)
     create_folder(output_p)
+    create_folder(output_g)
 
     page_number = 0
     total = 0
@@ -344,7 +465,7 @@ def run(year, from_page, to_page):
         rows = (soup.find("table", {"class": "results"})
                     .find_all('tr', {'class': ['even', 'odd']}))
 
-        with open(output_m % ("movie", year, page_number), "w") as f_m, open(output_c % ("cast", year, page_number), "w") as f_c, open(output_r % ("release", year, page_number), "w") as f_r, open(output_d % ("director", year, page_number), "w") as f_d, open(output_w % ("writer", year, page_number), "w") as f_w, open(output_p % ("production", year, page_number), "w") as f_p:
+        with open(output_m % ("movie", year, page_number), "w") as f_m, open(output_c % ("cast", year, page_number), "w") as f_c, open(output_r % ("release", year, page_number), "w") as f_r, open(output_d % ("director", year, page_number), "w") as f_d, open(output_w % ("writer", year, page_number), "w") as f_w, open(output_p % ("production", year, page_number), "w") as f_p, open(output_g % ("genre", year, page_number), "w") as f_g:
 
             writer_m = csv.writer(f_m, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
@@ -358,9 +479,10 @@ def run(year, from_page, to_page):
                                   quoting=csv.QUOTE_MINIMAL)
             writer_p = csv.writer(f_p, delimiter=';', quotechar='"',
                                   quoting=csv.QUOTE_MINIMAL)
+            writer_g = csv.writer(f_g, delimiter=';', quotechar='"',
+                                  quoting=csv.QUOTE_MINIMAL)
 
-#            for row in rows:
-            for row in rows[0:2]:
+            for row in rows:
                 detail_url = (row.find("td", {"class": "title"})
                                  .find("a")
                                  .get("href"))
@@ -372,6 +494,11 @@ def run(year, from_page, to_page):
                 movie = Movie(movie_id, detail_soup)
                 print " - Parsed %s" % movie.get_title()
                 writer_m.writerow(movie.get_data())
+
+                genre = MovieGenre(movie_id, detail_soup)
+                results = genre.get_data()
+                print "   + Parsed %d genres" % len(results)
+                writer_g.writerows(results)
 
                 director = MovieDirector(movie_id, detail_soup)
                 results = director.get_data()
@@ -421,11 +548,10 @@ def create_folder(output_file):
 
 
 if __name__ == "__main__":
-    for year in ["2011"]:  # , "2012", "2013"]:
+    for year in ["2013"]:  # , "2012", "2013"]:
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
-        #run(year, 0, total_page)
-        run(year, 0, 1)
+        run(year, 0, total_page)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
