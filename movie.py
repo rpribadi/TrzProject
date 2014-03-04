@@ -32,9 +32,10 @@ class Movie:
     def get_year(self):
         return (self.soup.find("h1")
                          .find('span', {'class': 'nobr'})
-                         .find('a')
                          .get_text()
-                         .strip())
+                         .strip()
+                         .replace("(", "")
+                         .replace(")", ""))
 
     def get_rating(self):
         rating = (self.soup
@@ -552,6 +553,6 @@ if __name__ == "__main__":
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
-        run(year, 0, total_page)
+        run(year, 18, total_page)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
