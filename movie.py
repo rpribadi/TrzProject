@@ -47,18 +47,22 @@ class Movie:
         return rating.get_text().strip()
 
     def get_budget(self):
-        budget = (self.soup
-                    .find('div', {'id': "titleDetails"})
-                    .find("h4", text="Budget:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        budget = details.find("h4", text="Budget:")
         if not budget:
             return None
 
         return budget.next.next.strip().encode("utf-8")
 
     def get_opening_weekend_gross(self):
-        gross = (self.soup
-                     .find('div', {'id': "titleDetails"})
-                     .find("h4", text="Opening Weekend:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        gross = details.find("h4", text="Opening Weekend:")
         if not gross:
             return None
 
@@ -66,9 +70,11 @@ class Movie:
         return gross.split()[0].encode("utf-8")
 
     def get_opening_weekend_country(self):
-        gross = (self.soup
-                     .find('div', {'id': "titleDetails"})
-                     .find("h4", text="Opening Weekend:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        gross = details.find("h4", text="Opening Weekend:")
         if not gross:
             return None
 
@@ -76,9 +82,11 @@ class Movie:
         return country.split()[1].replace("(", "").replace(")", "")
 
     def get_opening_weekend_date(self):
-        gross = (self.soup
-                     .find('div', {'id': "titleDetails"})
-                     .find("h4", text="Opening Weekend:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        gross = details.find("h4", text="Opening Weekend:")
         if not gross:
             return None
 
@@ -88,18 +96,22 @@ class Movie:
                      .encode("utf-8"))
 
     def get_gross(self):
-        gross = (self.soup
-                     .find('div', {'id': "titleDetails"})
-                     .find("h4", text="Gross:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        gross = details.find("h4", text="Gross:")
         if not gross:
             return None
 
         return gross.next.next.strip().encode("utf-8")
 
     def get_gross_country(self):
-        gross = (self.soup
-                     .find('div', {'id': "titleDetails"})
-                     .find("h4", text="Gross:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        gross = details.find("h4", text="Gross:")
         if not gross:
             return None
 
@@ -107,9 +119,11 @@ class Movie:
         return country.replace("(", "").replace(")", "")
 
     def get_gross_date(self):
-        gross = (self.soup
-                     .find('div', {'id': "titleDetails"})
-                     .find("h4", text="Gross:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        gross = details.find("h4", text="Gross:")
         if not gross:
             return None
 
@@ -123,7 +137,7 @@ class Movie:
                        .find('time', {'itemprop': "duration"}))
         if not runtime:
             return None
-        print "  + Duration: ", runtime.get_text().strip().split()[0]
+
         return runtime.get_text().strip().split()[0]
 
     def get_mpaa(self):
@@ -146,11 +160,14 @@ class Movie:
 
     def get_language(self):
 
-        language = (self.soup
-                    .find('div', {'id': "titleDetails"})
-                    .find("h4", text="Language:"))
+        details = self.soup.find('div', {'id': "titleDetails"})
+        if not details:
+            return None
+
+        language = details.find("h4", text="Language:")
         if not language:
             return None
+
         return language.find_next_sibling("a").get_text().strip().encode("utf-8")
 
     def get_data(self):
@@ -426,7 +443,7 @@ def get_total_page(year):
 
 def get_soup_page(url):
     # Always sleep before making any call
-    time.sleep(2)
+    time.sleep(3)
     try:
         print "[STATUS] Connecting to URL: %s." % url
         webpage = urlopen(url).read()
@@ -553,6 +570,6 @@ if __name__ == "__main__":
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
-        run(year, 131, total_page)
+        run(year, 0, total_page)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
