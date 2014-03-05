@@ -120,11 +120,11 @@ class Movie:
 
     def get_runtime(self):
         runtime = (self.soup
-                       .find('div', {'id': "titleDetails"})
-                       .find("h4", text="Runtime:"))
+                       .find('time', {'itemprop': "duration"}))
         if not runtime:
             return None
-        return runtime.find_next_sibling('time').get_text().strip().split()[0]
+        print "  + Duration: ", runtime.get_text().strip().split()[0]
+        return runtime.get_text().strip().split()[0]
 
     def get_mpaa(self):
 
@@ -335,7 +335,7 @@ class MovieReleaseDate:
             self.rows = table.findAll("tr")
 
     def get_country(self, index):
-        return self.rows[index].findAll("td")[0].get_text().strip()
+        return self.rows[index].findAll("td")[0].get_text().strip().encode("utf-8")
 
     def get_date(self, index):
         return self.rows[index].findAll("td")[1].get_text().strip()
@@ -553,6 +553,6 @@ if __name__ == "__main__":
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
-        run(year, 18, total_page)
+        run(year, 131, total_page)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
