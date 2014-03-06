@@ -142,20 +142,25 @@ class Movie:
 
     def get_mpaa(self):
 
-        mpaa = (self.soup
-                    .find('div', {'id': "titleStoryLine"})
-                    .find("span", {'itemprop': 'contentRating'}))
+        details = self.soup.find('div', {'id': "titleStoryLine"})
+        if not details:
+            return None
+
+        mpaa = details.find("span", {'itemprop': 'contentRating'})
         if not mpaa:
             return None
+
         return mpaa.get_text().strip()
 
     def get_country(self):
+        details = self.soup.find('div', {'id': "titleStoryLine"})
+        if not details:
+            return None
 
-        country = (self.soup
-                       .find('div', {'id': "titleDetails"})
-                       .find("h4", text="Country:"))
+        country = details.find("h4", text="Country:")
         if not country:
             return None
+
         return country.find_next_sibling("a").get_text().strip()
 
     def get_language(self):
@@ -195,9 +200,11 @@ class MovieGenre:
         self.movie_id = movie_id
         self.soup = soup
         self.rows = []
-        genres = (self.soup
-                      .find('div', {'id': "titleStoryLine"})
-                      .find("h4", text="Genres:"))
+        genres = None
+
+        details = self.soup.find('div', {'id': "titleStoryLine"})
+        if details:
+            genres = details.find("h4", text="Genres:")
         if genres:
             self.rows = genres.find_next_siblings('a')
 
@@ -222,8 +229,10 @@ class MovieGenre:
 class MovieDirector:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = (soup.find("div", {"id": "title-overview-widget"})
-                     .find("h4", text=re.compile(r"Director[s]{0,1}:")))
+        details = soup.find("div", {"id": "title-overview-widget"})
+        table = None
+        if details:
+            table = details.find("h4", text=re.compile(r"Director[s]{0,1}:"))
         if not table:
             self.rows = []
         else:
@@ -253,8 +262,10 @@ class MovieDirector:
 class MovieOpeningWeeked:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = (soup.find("div", {"id": "title-overview-widget"})
-                     .find("h4", text=re.compile(r"Director[s]{0,1}:")))
+        details = soup.find("div", {"id": "title-overview-widget"})
+        table = None
+        if details:
+            table = details.find("h4", text=re.compile(r"Director[s]{0,1}:"))
         if not table:
             self.rows = []
         else:
@@ -284,8 +295,10 @@ class MovieOpeningWeeked:
 class MovieWriter:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = (soup.find("div", {"id": "title-overview-widget"})
-                     .find("h4", text=re.compile(r"Writer[s]{0,1}:")))
+        details = soup.find("div", {"id": "title-overview-widget"})
+        table = None
+        if details:
+            table = details.find("h4", text=re.compile(r"Writer[s]{0,1}:"))
         if not table:
             self.rows = []
         else:
