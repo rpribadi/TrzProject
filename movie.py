@@ -142,15 +142,11 @@ class Movie:
 
     def get_mpaa(self):
 
-        details = self.soup.find('div', {'id': "titleStoryLine"})
-        if not details:
-            return None
-
-        mpaa = details.find("span", {'itemprop': 'contentRating'})
+        mpaa = self.soup.find('span', {'itemprop': "contentRating"})
         if not mpaa:
             return None
 
-        return mpaa.get_text().strip()
+        return mpaa.get("content").strip()
 
     def get_country(self):
         details = self.soup.find('div', {'id': "titleStoryLine"})
