@@ -451,12 +451,12 @@ def get_total_page(year):
     total_record = int(re.search(r"of (?P<total>[0-9,]+)\s*titles", _)
                          .group('total')
                          .replace(",", ""))
-    return int(math.ceil(total_record / RECORD_PER_PAGE))
+    return int(math.ceil(total_record / float(RECORD_PER_PAGE)))
 
 
 def get_soup_page(url):
     # Always sleep before making any call
-    time.sleep(3)
+    time.sleep(2)
     try:
         print "[STATUS] Connecting to URL: %s." % url
         webpage = urlopen(url).read()
@@ -551,14 +551,14 @@ def run(year, from_page, to_page):
                 print "   + Parsed %d casts" % len(results)
                 writer_c.writerows(results)
 
-                release_url = (detail_soup.find("a", text="Release Dates")
-                                          .get("href"))
-                release_date = MovieReleaseDate(
-                    movie_id, get_soup_page(BASE_URL + release_url)
-                )
-                results = release_date.get_data()
-                print "   + Parsed %d release dates" % len(results)
-                writer_r.writerows(results)
+                release_url = detail_soup.find("a", text="Release Dates")
+                if release_url:
+                    release_date = MovieReleaseDate(
+                        movie_id, get_soup_page(BASE_URL + release_url.get('href'))
+                    )
+                    results = release_date.get_data()
+                    print "   + Parsed %d release dates" % len(results)
+                    writer_r.writerows(results)
 
                 total += 1
                 print "[STATUS] Sleeping .."
