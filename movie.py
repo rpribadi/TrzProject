@@ -2,6 +2,7 @@ import errno
 import csv
 import math
 import re
+import sys
 import time
 import os
 
@@ -30,12 +31,12 @@ class Movie:
                          .encode('utf-8'))
 
     def get_year(self):
-        return (self.soup.find("h1")
-                         .find('span', {'class': 'nobr'})
-                         .get_text()
-                         .strip()
-                         .replace("(", "")
-                         .replace(")", ""))
+        year = self.soup.find("h1").find('span', {'class': 'nobr'})
+
+        if not year:
+            return None
+
+        return year.get_text().strip().replace("(", "").replace(")", "")
 
     def get_rating(self):
         rating = (self.soup
@@ -149,7 +150,7 @@ class Movie:
         return mpaa.get("content").strip()
 
     def get_country(self):
-        details = self.soup.find('div', {'id': "titleStoryLine"})
+        details = self.soup.find('div', {'id': "titleDetails"})
         if not details:
             return None
 
@@ -458,7 +459,7 @@ def get_soup_page(url):
         webpage = urlopen(url).read()
     except Exception, e:
         print "[ERROR] Can't connect to URL: %s. Reason: %s." % (url, e)
-        return None
+        sys.exit(1)
     else:
         print "[STATUS] Connected. Parsing URL content."
         return BeautifulSoup(webpage.decode('utf-8', "ignore"))
@@ -560,7 +561,7 @@ def run(year, from_page, to_page):
                 print "[STATUS] Sleeping .."
 
         print "[STATUS] Page Sleeping .."
-        time.sleep(2)
+        time.sleep(5)
 
     print "[STATUS] Parsing %s pages done. Total: %s." % (page_number, total)
 
@@ -575,7 +576,7 @@ def create_folder(output_file):
 
 
 if __name__ == "__main__":
-    for year in ["2013"]:  # , "2012", "2013"]:
+    for year in ["2013"]:
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page

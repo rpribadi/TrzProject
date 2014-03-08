@@ -120,7 +120,7 @@ def create_folder(output_file):
 
 
 if __name__ == "__main__":
-    for year in ["2011", "2012", "2013"]:
+    for year in ["2013"]:
         run(year)
         print "[STATUS] Long sleeping ......"
         time.sleep(60)
