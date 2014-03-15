@@ -325,7 +325,7 @@ class MovieWriter:
 class MovieProduction:
     def __init__(self, movie_id, soup):
         self.movie_id = movie_id
-        table = soup.find("h4", text="Writers:")
+        table = soup.find("h4", text="Production Co:")
         if not table:
             self.rows = []
         else:
@@ -333,8 +333,8 @@ class MovieProduction:
 
     def get_id(self, index):
         return re.search(
-            r"/name/(?P<id>\w+)/",
-            self.rows[index].get("a").get('href')
+            r"/company/(?P<id>\w+)?",
+            self.rows[index].find("a").get('href')
         ).group("id")
 
     def get_data_at(self, index):
@@ -580,6 +580,7 @@ if __name__ == "__main__":
         print "[STATUS] Counting total page for %s" % year
         total_page = get_total_page(year)
         print "[STATUS] Found %s pages" % total_page
-        run(year, 0, total_page)
+        #run(year, 0, total_page)
+        run(year, 70, 90)
         print "[STATUS] Long sleeping ......"
         time.sleep(30)
